@@ -1,39 +1,11 @@
 import os
 import tensorflow as tf
-from utils import get_data, data_hparams
 from keras.callbacks import ModelCheckpoint
-
-
-# 0.准备训练所需数据------------------------------
-data_args = data_hparams()
-data_args.data_type = 'train'
-data_args.data_path = '../dataset/'
-data_args.thchs30 = True
-data_args.aishell = True
-data_args.prime = True
-data_args.stcmd = True
-data_args.batch_size = 4
-data_args.data_length = 10
-# data_args.data_length = None
-data_args.shuffle = True
-train_data = get_data(data_args)
-
-# 0.准备验证所需数据------------------------------
-data_args = data_hparams()
-data_args.data_type = 'dev'
-data_args.data_path = '../dataset/'
-data_args.thchs30 = True
-data_args.aishell = True
-data_args.prime = False
-data_args.stcmd = False
-data_args.batch_size = 4
-# data_args.data_length = None
-data_args.data_length = 10
-data_args.shuffle = True
-dev_data = get_data(data_args)
+from data_settings import train_data, dev_data
 
 # 1.声学模型训练-----------------------------------
 from model_speech.cnn_ctc import Am, am_hparams
+
 am_args = am_hparams()
 am_args.vocab_size = len(train_data.am_vocab)
 am_args.gpu_nums = 1
@@ -50,7 +22,8 @@ batch_num = len(train_data.wav_lst) // train_data.batch_size
 
 # checkpoint
 ckpt = "model_{epoch:02d}-{val_acc:.2f}.hdf5"
-checkpoint = ModelCheckpoint(os.path.join('./checkpoint', ckpt), monitor='val_loss', save_weights_only=False, verbose=1, save_best_only=True)
+checkpoint = ModelCheckpoint(os.path.join('./checkpoint', ckpt), monitor='val_loss', save_weights_only=False, verbose=1,
+                             save_best_only=True)
 
 #
 # for k in range(epochs):
@@ -62,12 +35,13 @@ checkpoint = ModelCheckpoint(os.path.join('./checkpoint', ckpt), monitor='val_lo
 batch = train_data.get_am_batch()
 dev_batch = dev_data.get_am_batch()
 
-am.ctc_model.fit_generator(batch, steps_per_epoch=batch_num, epochs=10, callbacks=[checkpoint], workers=1, use_multiprocessing=False, validation_data=dev_batch, validation_steps=200)
+am.ctc_model.fit_generator(batch, steps_per_epoch=batch_num, epochs=epochs, callbacks=[checkpoint], workers=1,
+                           use_multiprocessing=False, validation_data=dev_batch, validation_steps=200)
 am.ctc_model.save_weights('logs_am/model.h5')
-
 
 # 2.语言模型训练-------------------------------------------
 from model_language.transformer import Lm, lm_hparams
+
 lm_args = lm_hparams()
 lm_args.num_heads = 8
 lm_args.num_blocks = 6
@@ -80,9 +54,8 @@ lm_args.lr = 0.0003
 lm_args.is_training = True
 lm = Lm(lm_args)
 
-epochs = 10
 with lm.graph.as_default():
-    saver =tf.train.Saver()
+    saver = tf.train.Saver()
 with tf.Session(graph=lm.graph) as sess:
     merged = tf.summary.merge_all()
     sess.run(tf.global_variables_initializer())
@@ -99,11 +72,11 @@ with tf.Session(graph=lm.graph) as sess:
         for i in range(batch_num):
             input_batch, label_batch = next(batch)
             feed = {lm.x: input_batch, lm.y: label_batch}
-            cost,_ = sess.run([lm.mean_loss,lm.train_op], feed_dict=feed)
+            cost, _ = sess.run([lm.mean_loss, lm.train_op], feed_dict=feed)
             total_loss += cost
             if (k * batch_num + i) % 10 == 0:
-                rs=sess.run(merged, feed_dict=feed)
+                rs = sess.run(merged, feed_dict=feed)
                 writer.add_summary(rs, k * batch_num + i)
-        print('epochs', k+1, ': average loss = ', total_loss/batch_num)
+        print('epochs', k + 1, ': average loss = ', total_loss / batch_num)
     saver.save(sess, 'logs_lm/model_%d' % (epochs + add_num))
     writer.close()

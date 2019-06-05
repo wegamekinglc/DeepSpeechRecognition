@@ -4,12 +4,8 @@ import difflib
 import tensorflow as tf
 import numpy as np
 from utils import decode_ctc, GetEditDistance
-
-
-# 0.准备解码所需字典，参数需和训练一致，也可以将字典保存到本地，直接进行读取
-from utils import get_data, data_hparams
-data_args = data_hparams()
-train_data = get_data(data_args)
+from data_settings import train_data, train_data_args
+from utils import get_data
 
 
 # 1.声学模型-----------------------------------
@@ -32,7 +28,7 @@ print('loading language model...')
 lm = Lm(lm_args)
 sess = tf.Session(graph=lm.graph)
 with lm.graph.as_default():
-    saver =tf.train.Saver()
+    saver = tf.train.Saver()
 with sess.as_default():
     latest = tf.train.latest_checkpoint('logs_lm')
     saver.restore(sess, latest)
@@ -40,16 +36,17 @@ with sess.as_default():
 # 3. 准备测试所需数据， 不必和训练数据一致，通过设置data_args.data_type测试，
 #    此处应设为'test'，我用了'train'因为演示模型较小，如果使用'test'看不出效果，
 #    且会出现未出现的词。
-data_args.data_type = 'train'
-data_args.shuffle = False
-data_args.batch_size = 1
-test_data = get_data(data_args)
+train_data_args.data_type = 'train'
+train_data_args.shuffle = False
+train_data_args.batch_size = 1
+test_data = get_data(train_data_args)
 
 # 4. 进行测试-------------------------------------------
 am_batch = test_data.get_am_batch()
 word_num = 0
 word_error_num = 0
-for i in range(10):
+n_examples = 10
+for i in range(n_examples):
     print('\n the ', i, 'th example.')
     # 载入训练好的模型，并进行识别
     inputs, _ = next(am_batch)

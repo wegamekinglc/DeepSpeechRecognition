@@ -60,7 +60,7 @@ class Am():
         opt = Adam(lr = self.lr, beta_1 = 0.9, beta_2 = 0.999, decay = 0.01, epsilon = 10e-8)
         if self.gpu_nums > 1:
             self.ctc_model=multi_gpu_model(self.ctc_model,gpus=self.gpu_nums)
-        self.ctc_model.compile(loss={'ctc': lambda y_true, output: output}, optimizer=opt)
+        self.ctc_model.compile(loss={'ctc': lambda y_true, output: output}, optimizer=opt, metrics=['accuracy'])
 
 
 
